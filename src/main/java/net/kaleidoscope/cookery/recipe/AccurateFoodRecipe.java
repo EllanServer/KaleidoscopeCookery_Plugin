@@ -11,7 +11,6 @@ public record AccurateFoodRecipe(
         Key id,
         Key input,
         List<WeightedResult> results,
-        int resultCount,
         ApplianceType cook,
         int rotations,
         int resultCount,
