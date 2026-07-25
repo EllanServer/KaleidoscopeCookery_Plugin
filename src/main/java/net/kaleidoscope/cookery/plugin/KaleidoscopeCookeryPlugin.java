@@ -13,10 +13,14 @@ import net.kaleidoscope.cookery.api.MillstoneAnimals;
 import net.kaleidoscope.cookery.item.StrawHatListener;
 import net.kaleidoscope.cookery.recipe.FoodRecipeManager;
 import net.kaleidoscope.cookery.util.ConsoleMessages;
+import net.kaleidoscope.cookery.util.CraftEngineFoodComponentMigrator;
 import net.kaleidoscope.cookery.util.FoliaUtil;
 import net.momirealms.antigrieflib.AntiGriefLib;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.IOException;
+import java.nio.file.Path;
 
 public final class KaleidoscopeCookeryPlugin extends JavaPlugin {
     // bStats 插件 ID：https://bstats.org/plugin/bukkit/KaleidoscopeCookeryPlugin/32444
@@ -30,7 +34,15 @@ public final class KaleidoscopeCookeryPlugin extends JavaPlugin {
     private Object placeholderExpansion;
 
     @Override
+    public void onLoad() {
+        migrateLegacyFoodComponents();
+    }
+
+    @Override
     public void onEnable() {
+        // CraftEngine enables before this plugin. Run the idempotent migration again in case
+        // its data folder or resources were created during CraftEngine's enable phase.
+        migrateLegacyFoodComponents();
         instance = this;
         saveDefaultConfig();
         ConsoleMessages.load(this);
@@ -57,6 +69,34 @@ public final class KaleidoscopeCookeryPlugin extends JavaPlugin {
         setupPlaceholders();
         setupMetrics();
         getLogger().info(ConsoleMessages.t("plugin.enabled"));
+    }
+
+    private void migrateLegacyFoodComponents() {
+        Path pluginsDirectory = getDataFolder().toPath().toAbsolutePath().getParent();
+        if (pluginsDirectory == null) {
+            return;
+        }
+
+        Path configurationDirectory = pluginsDirectory
+                .resolve("CraftEngine")
+                .resolve("resources")
+                .resolve("KaleidoscopeCookery")
+                .resolve("configuration");
+        try {
+            CraftEngineFoodComponentMigrator.MigrationReport report =
+                    CraftEngineFoodComponentMigrator.migrate(configurationDirectory);
+            if (report.componentsChanged() > 0) {
+                getLogger().info("Migrated " + report.componentsChanged()
+                        + " legacy CraftEngine food components in " + report.filesChanged()
+                        + " file(s) from saturation_modifier to absolute saturation values.");
+            }
+            if (report.componentsSkipped() > 0) {
+                getLogger().warning("Skipped " + report.componentsSkipped()
+                        + " ambiguous legacy CraftEngine food component(s); check their nutrition and saturation fields.");
+            }
+        } catch (IOException | RuntimeException e) {
+            getLogger().warning("Failed to migrate legacy CraftEngine food components: " + e.getMessage());
+        }
     }
 
     @Override

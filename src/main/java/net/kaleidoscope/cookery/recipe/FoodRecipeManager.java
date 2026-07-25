@@ -340,8 +340,6 @@ public final class FoodRecipeManager {
                 }
                 rotations = section.getInt("rotations", 0);
             }
-            // 单次产出份数 不配或配非法值都归一到 1
-            int resultCount = Math.max(1, section.getInt("result_count", 1));
             List<String> lore = section.getStringList("lore");
 
             FoodRecipeRegistry.instance().registerAccurate(
